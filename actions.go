@@ -2,23 +2,19 @@ package plscli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
-func (c *PlsClient) Run() error {
+func (c *PlsClient) RunWithContext(ctx context.Context) error {
 
 	if err := register(c); err != nil {
 		return fmt.Errorf("failed to register command: %w", err)
 	}
 
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
-	<-signalCh
+	<-ctx.Done()
 
 	return unregister(c)
 }
@@ -82,4 +78,38 @@ func unregister(c *PlsClient) error {
 	}
 
 	return nil
+}
+
+func (c *PlsClient) IsLeader() (bool, error) {
+	req := LeaderRequest{
+		ClientId:   c.ClientId,
+		DeployName: c.DeployName,
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := c.Http.Post(c.Url+"/leader", "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return false, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("failed to check leader")
+	}
+
+	var r LeaderResponse
+	if err = json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return false, err
+	}
+
+	if r.ClientId != c.ClientId {
+		return false, nil
+	}
+
+	return true, nil
 }
