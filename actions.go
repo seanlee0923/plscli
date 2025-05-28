@@ -6,12 +6,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 func (c *PlsClient) RunWithContext(ctx context.Context) error {
+	retryInterval := 5 * time.Second
 
-	if err := register(c); err != nil {
-		return fmt.Errorf("failed to register command: %w", err)
+	for {
+		err := register(c)
+		if err == nil {
+			break
+		}
+
+		fmt.Printf("register failed: %v. retrying in %s...\n", err, retryInterval)
+
+		select {
+		case <-time.After(retryInterval):
+			continue
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled before successful registration")
+		}
 	}
 
 	<-ctx.Done()
