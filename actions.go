@@ -94,6 +94,10 @@ func unregister(c *PlsClient) error {
 	return nil
 }
 
+func (c *PlsClient) Registered() bool {
+	return c.ClientId != ""
+}
+
 func (c *PlsClient) IsLeader() (bool, error) {
 	req := LeaderRequest{
 		ClientId:   c.ClientId,
