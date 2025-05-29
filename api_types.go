@@ -25,3 +25,8 @@ type LeaderRequest struct {
 type LeaderResponse struct {
 	ClientId string `json:"client_id"`
 }
+
+type KeepAlive struct {
+	ClientId   string `json:"client_id"`
+	DeployName string `json:"deploy_name"`
+}

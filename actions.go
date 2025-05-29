@@ -27,8 +27,16 @@ func (c *PlsClient) RunWithContext(ctx context.Context) error {
 			return fmt.Errorf("context canceled before successful registration")
 		}
 	}
+	keepAliveTicker := time.NewTicker(30 * time.Second)
+
+	for range keepAliveTicker.C {
+		if err := alive(c); err != nil {
+			fmt.Print(err)
+		}
+	}
 
 	<-ctx.Done()
+	keepAliveTicker.Stop()
 
 	return unregister(c)
 }
@@ -59,6 +67,36 @@ func register(c *PlsClient) error {
 	c.ClientId = r.ClientId
 
 	return nil
+}
+
+func alive(c *PlsClient) error {
+	req := KeepAlive{
+		ClientId:   c.ClientId,
+		DeployName: c.DeployName,
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.Http.Post(c.Url+"/alive", "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("can not handle keep alive")
+	}
+
+	var r KeepAlive
+	if err = json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 func unregister(c *PlsClient) error {
